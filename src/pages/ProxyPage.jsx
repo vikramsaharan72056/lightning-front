@@ -6,6 +6,8 @@ import { formatDate, formatTime } from "../assets/usables";
 import DataLeftCircle from "../components/DataLeftCircles";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
+import { io } from "socket.io-client";
+
 
 const ProxyComponent = () => {
   const accountDetails = useSelector((state) => state.account.info);
@@ -225,38 +227,25 @@ const ProxyComponent = () => {
   
 
   useEffect(() => {
-    const fetchBandwidth = async () => {
-      try {
-        const response = await axios.get(
-          "https://lightning-backend.onrender.com/api/proxies/check-bandwidth"
-        );
-        
-
-        if (response.data.success && response.data.latestCronData) {
-
-          const filteredPlans = response.data.latestCronData.plans.filter(
-            (plan) => plan.user === username
-          );
-          
-
-
-          setBandwidthData({
-            ...response.data.latestCronData,
-            plans: filteredPlans,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching bandwidth data:", error);
+    const socket = io("http://localhost:5000/"); // Connect to WebSocket
+  
+    // Listen for real-time updates
+    socket.on("data-update", (data) => {
+      console.log("📡 Received real-time bandwidth update:", data);
+  
+      if (data && data.plans) {
+        const filteredPlans = data.plans.filter((plan) => plan.user === username);
+        console.log("got data")
+        setBandwidthData({ ...data, plans: filteredPlans });
       }
+    });
+  
+    // Cleanup WebSocket connection on unmount
+    return () => {
+      socket.disconnect();
     };
-
-    fetchBandwidth();
-
-
-    const interval = setInterval(fetchBandwidth, 6 * 1000);
-
-    return () => clearInterval(interval);
   }, [username]);
+  
 
   return (
     <main className="px-0 xl:px-10 2xl:px-14">
