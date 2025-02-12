@@ -364,8 +364,8 @@ const ProxyComponent = () => {
           </div>
           <div class="col-span-1 md:col-span-2 flex items-center gap-3 flex-wrap md:flex-nowrap ">
             <DataLeftCircle
-              usedData={Math.round(plan?.bandwidthLeft)}
-              totalData={Math.round(plan?.bandwidth)}
+              usedData={(plan?.bandwidthLeft).toFixed(2)}
+              totalData={(plan?.bandwidth).toFixed(2)}
             />
 
             <div className="w-full">
