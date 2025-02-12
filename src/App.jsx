@@ -1,10 +1,10 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import MainLayout from "./layout/MainLayout"
-import Dashboard from "./components/Dashboard";
+import Dashboard from "./pages/Dashboard";
 import PurchasePlan from "./pages/PurchasePlan";
 import DepositeBalance from "./pages/DepositeBalance";
 import Page404 from "./pages/Page404";
-import Checkout from "./components/Checkout";
+import Checkout from "./pages/Checkout";
 import ProxyComponent from "./pages/ProxyPage";
 
 export default function App() {

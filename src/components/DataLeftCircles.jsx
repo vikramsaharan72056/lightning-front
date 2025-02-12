@@ -4,11 +4,11 @@ const DataLeftCircle = ({ usedData, totalData }) => {
     const strokeDashoffset = ((100 - percentageLeft) / 100) * strokeDasharray; 
   
     return (
-      <div className="relative mt-3 flex justify-center">
-        <div className="relative w-24 h-24">
+      <div className="relative flex justify-center">
+        <div className="relative w-[120px] h-[120px]">
           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
             <circle
-              className="text-gray-200"
+              className="text-[#8bbaff]"
               strokeWidth="12"
               stroke="currentColor"
               fill="transparent"
@@ -17,7 +17,7 @@ const DataLeftCircle = ({ usedData, totalData }) => {
               cy="50"
             />
             <circle
-              className="text-blue-500"
+              className="text-[#1675ff]"
               strokeWidth="12"
               strokeDasharray="251.2"
               strokeDashoffset={strokeDashoffset}
@@ -29,8 +29,9 @@ const DataLeftCircle = ({ usedData, totalData }) => {
               cy="50"
             />
           </svg>
-          <div className="absolute inset-0 flex items-center justify-center text-blue-500 font-bold flex-col text-sm">
+          <div className="absolute inset-0 flex items-center justify-center flex-col text-[#292742] text-[15px] leading-[20px] font-bold m-0">
             {Math.round(percentageLeft)}%
+            <span className="font-normal text-xs">Data left</span>
           </div>
         </div>
       </div>

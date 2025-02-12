@@ -1,553 +1,717 @@
-import { useState, useEffect } from "react";
-import ChevronRight from "../assets/icons";
+import { useState, useEffect, useCallback } from "react";
+
 import { useSelector, useDispatch } from "react-redux";
 import { setAccountInfo } from "../redux/accountSlice";
-import { formatDate } from "../assets/usables";
+import { formatDate, formatTime } from "../assets/usables";
 import DataLeftCircle from "../components/DataLeftCircles";
 import axios from "axios";
+import { useLocation } from "react-router-dom";
 
 const ProxyComponent = () => {
-    const accountDetails = useSelector((state) => state.account.info);
-    const [activeTab, setActiveTab] = useState("auth");
-    const [accountInfo, setAccountInfoState] = useState(null);
-    const [stickyCount, setStickyCount] = useState(2000);
-    const [stickySession, setStickySession] = useState(1);
-    const [superSticky, setSuperSticky] = useState(false);
-    const [gigabytesToAdd, setGigabytesToAdd] = useState(0);
-    const [countries, setCountries] = useState([]);
-    const [states, setStates] = useState([]);
-    const [cities, setCities] = useState([]);
-    const [username, setUsername] = useState(accountDetails?.user || "");
-    const [password, setPassword] = useState(accountDetails?.pass || "");
-    const [updateStatus, setUpdateStatus] = useState(null);
+  const accountDetails = useSelector((state) => state.account.info);
+  const location = useLocation();
+  const plan = location.state?.plan;
+  const [activeTab, setActiveTab] = useState("auth");
+  const [accountInfo, setAccountInfoState] = useState(null);
+  
+  const [stickySession, setStickySession] = useState(1);
+ 
+  const [sessionToken, setSessionToken] = useState("");
+  const [sessionTime, setSessionTime] = useState(0);
 
-    const [selectedCountry, setSelectedCountry] = useState("");
-    const [selectedState, setSelectedState] = useState("");
-    const dispatch = useDispatch();
-   
+  const [gigabytesToAdd, setGigabytesToAdd] = useState(0);
+  const [countries, setCountries] = useState([]);
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [username, setUsername] = useState(plan?.user || "");
+  const [password, setPassword] = useState(plan?.pass || "");
+  
+  const [proxyString, setProxyString] = useState("");
+  const [proxyList, setProxyList] = useState([]);
 
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
+  const [bandwidthData, setBandwidthData] = useState(null);
 
-    useEffect(() => {
-        if (!accountDetails) {
-            const storedAccountInfo = localStorage.getItem("accountInfo");
-            if (storedAccountInfo) {
-                const parsedAccountInfo = JSON.parse(storedAccountInfo);
-                setAccountInfoState(parsedAccountInfo); // ✅ Updates local state
-                dispatch(setAccountInfo(parsedAccountInfo)); // ✅ Updates Redux
-                console.log("Loaded account details from localStorage into Redux");
-            }
-        }
-    }, [dispatch, accountDetails]);
-    useEffect(() => {
-        if (accountDetails) {
-            setAccountInfoState(accountDetails);
-            const fetchCountries = async () => {
-                try {
-                    const response = await axios.post("http://localhost:5000/api/proxies/get-country-list");
-                    if (response.data.success) {
-                        setCountries(response.data.countries);
-                    }
-                } catch (error) {
-                    console.error("Error fetching countries:", error);
-                }
-            };
-            fetchCountries();
-        }
-    }, []);
-    console.log(accountInfo, "accountInfo");
-    console.log(accountInfo?.expiresAt, "ExpiryDate")
+  const dispatch = useDispatch();
 
-    useEffect(() => {
-        if (selectedCountry) {
-            const fetchStates = async () => {
-                try {
-                    const response = await axios.post("http://localhost:5000/api/proxies/get-state-list", {
-                        country_code: selectedCountry
-                    });
-                    if (response.data.success) {
-                        setStates(response.data.states);
-                        setCities([]); // Reset cities when country changes
-                    }
-                } catch (error) {
-                    console.error("Error fetching states:", error);
-                }
-            };
-            fetchStates();
-        }
-    }, [selectedCountry]);
+  useEffect(() => {
+    if (!accountDetails) {
+      const storedAccountInfo = localStorage.getItem("accountInfo");
+      if (storedAccountInfo) {
+        const parsedAccountInfo = JSON.parse(storedAccountInfo);
+        setAccountInfoState(parsedAccountInfo); // ✅ Updates local state
+        dispatch(setAccountInfo(parsedAccountInfo)); // ✅ Updates Redux
+        console.log("Loaded account details from localStorage into Redux");
+      }
+    }
+  }, [dispatch, accountDetails]);
 
+  console.log(bandwidthData, "bandwidthData");
 
+  const generateProxy = useCallback(() => {
+    if (!username || !password || !plan?.id) return; // Ensure required fields exist
 
-    useEffect(() => {
-        if (selectedCountry && selectedState) {
-            const fetchCities = async () => {
-                try {
-                    const response = await axios.post("http://localhost:5000/api/proxies/get-city-list", {
-                        country_code: selectedCountry,
-                        state: selectedState
-                    });
-                    if (response.data.success) {
-                        setCities(response.data.cities);
-                    }
-                } catch (error) {
-                    console.error("Error fetching cities:", error);
-                }
-            };
-            fetchCities();
-        }
-    }, [selectedState]);
+    const host = "resi-ww.lightningproxies.net"; // Static Host
+    const port = "9999"; // Static Port
+    const zone = "zone-resi"; // Static Zone
+    const sessionId = Math.random().toString(36).substring(2, 10); // Random session ID
+    const formattedSessionTime = `sessTime-${sessionTime}`;
+    
 
+    const locationString = [
+      selectedCountry ? `country-${selectedCountry}` : null,
+      selectedState ? `state-${selectedState}` : null,
+      selectedCity ? `city-${selectedCity}` : null,
+    ]
+      .filter(Boolean)
+      .join("-");
 
-    const handleAddGigabytes = async () => {
-        if (!accountDetails?.id || gigabytesToAdd <= 0) {
-            alert("Invalid plan ID or gigabyte amount.");
-            return;
-        }
+    const rotatingProxy = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}-${formattedSessionTime}:${password}`;
 
-        try {
-            const response = await axios.post("http://localhost:5000/api/proxies/modify-gigabytes", {
-                action: "add",
-                planId: accountDetails.id,
-                gigabytes: gigabytesToAdd
-            });
+    const proxyEntry = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}:${password}`;
 
-            if (response.data.success) {
-                alert("Gigabytes added successfully!");
-                console.log(response.data, "response for adding GB");
-                setGigabytesToAdd(0);
+    setProxyString(rotatingProxy);
+    setProxyList((prev) => [...prev, proxyEntry]); // ✅ Use function form to avoid unnecessary dependencies
 
-                // ✅ Extract 'Remaining' correctly from response
-                const updatedBandwidthLeft = response.data.data.Remaining;
-
-                // ✅ Create updated object
-                const updatedAccountInfo = {
-                    ...accountDetails,
-                    bandwidth: accountDetails.bandwidth + gigabytesToAdd,  // Add the requested GB
-                    bandwidthLeft: updatedBandwidthLeft  // Update with API response value
-                };
-
-                // ✅ Update Redux Store
-                dispatch(setAccountInfo(updatedAccountInfo));
-
-                // ✅ Save to LocalStorage
-                localStorage.setItem("accountInfo", JSON.stringify(updatedAccountInfo));
-
-                // ✅ Update Local State
-                setAccountInfoState(updatedAccountInfo);
-            } else {
-                alert("Failed to add gigabytes.");
-            }
-        } catch (error) {
-            console.error("Error adding gigabytes:", error);
-            alert("Error adding gigabytes.");
-        }
-    };
-
-
-    const handleUpdateUser = async () => {
-        if (!accountDetails?.id || !username || !password) {
-            alert("Please provide a valid username and password.");
-            return;
-        }
-
-        try {
-            const response = await axios.post(
-                `http://localhost:5000/api/proxies/update-user/${accountDetails.id}`,
-                {
-                    planType: "residential",
-                    username,
-                    password,
-                    proxyType: null
-                }
-            );
-
-            if (response.data.success) {
-                setUpdateStatus("User updated successfully!");
-                alert("User updated successfully!");
-
-                // ✅ Update local state and Redux
-                const updatedAccountInfo = { ...accountDetails, user: username, pass: password };
-                dispatch(setAccountInfo(updatedAccountInfo));
-                localStorage.setItem("accountInfo", JSON.stringify(updatedAccountInfo));
-            } else {
-                setUpdateStatus("Failed to update user.");
-            }
-        } catch (error) {
-            console.error("Error updating user:", error);
-            setUpdateStatus("Error updating user.");
-        }
-    };
-
-
-
-
-
-    return (
-        <main className="flex-1 p-4 sm:p-6 md:p-8 bg-gray-50 rounded-lg shadow">
-            {/* Header */}
-            <div className="flex flex-wrap justify-between items-center mb-6">
-                <div>
-                    <h2 className="text-2xl font-bold">Generate Proxy</h2>
-                    <h3 className="text-gray-500 text-md">
-                        Plan ID: {accountInfo?.id}
-                    </h3>
-                </div>
-                <div className="flex items-center justify-end gap-1">
-                    <p>Need Support ?</p>
-                    <button className="py-2 px-3 bg-blue-500 text-white rounded-lg shadow flex items-center gap-1">
-                        Contact Us <ChevronRight />
-                    </button>
-                </div>
-
-            </div>
-
-            {/* 🔹 Top Section: Two Small Cards (50%) + One Large Bandwidth Card (50%) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left: Two Small Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Current Plan */}
-                    <div className="p-4 bg-white shadow rounded-lg  ">
-                        <div className="flex justify-between">
-                            <img
-                                src="https://lightningproxies.net/assets/images/icons/qube.svg"
-                                alt="calendar"
-                                className="p-3 bg-blue-500 flex justify-center items-center shadow rounded-lg w-12 h-12"
-                            />
-                            <div>
-                                <a href="#" className="px-2 py-1 bg-blue-100 text-blue-500 rounded-lg border border-blue-500 flex items-center">
-                                    Plan Settings <ChevronRight />
-                                </a>
-                            </div>
-
-
-
-                        </div>
-                        <span className="inline-block mt-4">
-                            <p className="text-gray-500 text-sm mt-2">Current Plan</p>
-                            <p className="text-xl font-bold">Residential {accountInfo?.bandwidth} GB</p>
-                        </span>
-
-
-                    </div>
-
-                    {/* Plan Expiry */}
-                    <div className="p-4 bg-white shadow rounded-lg  ">
-                        <div className="flex justify-between">
-                            <img
-                                src="https://lightningproxies.net/assets/images/icons/date-w.svg"
-                                alt="calendar"
-                                className="p-3 bg-blue-500 flex justify-center items-center shadow rounded-lg w-12 h-12"
-                            />
-                            <div>
-                                <a href="#" className="px-2 py-1 bg-blue-100 text-blue-500 rounded-lg border border-blue-500 flex items-center">
-                                    Auto Renew <ChevronRight />
-                                </a>
-                            </div>
-
-
-
-                        </div>
-                        <span className="inline-block mt-4">
-                            <p className="text-gray-500 text-sm mt-2">Plan Expiry</p>
-                            <p className="text-xl font-bold">{accountInfo ? formatDate(accountInfo?.expiresAt) : null}</p>
-                        </span>
-
-
-                    </div>
-
-                </div>
-
-                {/* Right: Bandwidth Usage (Takes Full Right Half) */}
-                <div className="p-4 bg-white shadow rounded-lg flex flex-col sm:flex-row justify-start gap-4 sm:gap-6">
-                    {/* ✅ Left Section - Total Bandwidth */}
-                    <div className="w-full sm:w-3/12 border-b sm:border-b-0 sm:border-r border-gray-200 pb-4 sm:pb-0 sm:pr-4 flex flex-col items-center sm:items-start">
-                        <img
-                            src="https://lightningproxies.net/assets/images/icons/quee.svg"
-                            alt="calendar"
-                            className="p-3 bg-blue-500 flex justify-center items-center shadow rounded-lg w-12 h-12"
-                        />
-                        <span className="inline-block mt-4 text-center sm:text-left">
-                            <p className="text-gray-500 text-sm mt-2">Total Bandwidth</p>
-                            <p className="text-xl font-bold">{accountInfo?.bandwidth} GB</p>
-                        </span>
-                    </div>
-
-                    {/* ✅ Center Section - Data Circle */}
-                    <div className="w-full sm:w-auto flex justify-center sm:justify-start">
-                        <DataLeftCircle usedData={accountInfo?.bandwidthLeft} totalData={accountInfo?.bandwidth} />
-                    </div>
-
-                    {/* ✅ Right Section - Used & Remaining Bandwidth + Add Bandwidth */}
-                    <div className="w-full sm:w-7/12">
-                        <div className="flex flex-col justify-between gap-2 w-full">
-                            <div className="space-y-2">
-                                {/* ✅ Used Bandwidth */}
-                                <div className="flex justify-between items-center flex-wrap">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-                                        <p className="text-gray-500 text-sm sm:text-xs">Used Bandwidth:</p>
-                                    </div>
-                                    <p className="text-sm sm:text-xs">{accountInfo?.bandwidth - accountInfo?.bandwidthLeft} GB</p>
-                                </div>
-
-                                {/* ✅ Remaining Bandwidth */}
-                                <div className="flex justify-between items-center flex-wrap">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="w-3 h-3 bg-gray-300 rounded-full"></span>
-                                        <p className="text-gray-500 text-sm sm:text-xs">Remaining Bandwidth:</p>
-                                    </div>
-                                    <p className="text-sm sm:text-xs">{accountInfo?.bandwidthLeft} GB</p>
-                                </div>
-                            </div>
-
-                            {/* ✅ Add Bandwidth Section */}
-                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-3 lg:ml-5">
-                                <div className="flex flex-col w-full">
-                                    <label className="text-gray-500 text-sm sm:text-xs">Add Bandwidth</label>
-                                    <div className="flex justify-between items-center gap-2 sm:gap-4">
-                                        <input
-                                            type="number"
-                                            placeholder="0"
-                                            min={1}
-                                            value={gigabytesToAdd === 0 ? "" : gigabytesToAdd} // ✅ Prevents 0 from sticking
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setGigabytesToAdd(val === "" ? "" : Math.max(1, parseInt(val))); // ✅ Ensures min value is 1
-                                            }}
-                                            className="w-full border px-2 py-1 rounded-lg text-sm sm:text-xs"
-                                        />
-
-                                        <button
-                                            onClick={handleAddGigabytes}
-                                            className="py-1 px-3 bg-blue-500 text-white rounded-lg shadow flex items-center"
-                                        >
-                                            <span className="flex items-center gap-1">
-                                                <p className="text-sm sm:text-xs">Add</p>
-                                                <ChevronRight />
-                                            </span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            {/* 🔹 Second Section: Configure Proxy & Proxy (Each Takes 50%) */}
-            <div className="flex flex-col mt-10">
-                <div>
-                    <h3 className="text-lg font-semibold">Configure Proxy</h3>
-                    <p className="text-gray-600 mb-4">
-                        Configure your proxy type, and whitelist IP
-                    </p>
-                </div>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mt-8 w-full">
-                {/* ✅ Configure Proxy Section */}
-                <div className="p-6 bg-white shadow rounded-lg w-full sm:w-1/2">
-                    {/* ✅ Tabs Section */}
-                    <div className="flex justify-end gap-4">
-                        <div className="flex items-center space-x-2">
-                            <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-                            <p className="text-gray-500 text-sm sm:text-xs">Standard</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <span className="w-3 h-3 bg-gray-300 rounded-full"></span>
-                            <p className="text-gray-500 text-sm sm:text-xs">Regions</p>
-                        </div>
-                    </div>
-
-                    {/* ✅ Tab Navigation */}
-                    <div className="flex border-b">
-                        <button
-                            className={`p-2 text-sm font-semibold ${activeTab === "auth" ? "border-b-2 border-blue-500 text-blue-500" : "text-gray-500"
-                                }`}
-                            onClick={() => setActiveTab("auth")}
-                        >
-                            User Auth & Pass
-                        </button>
-                        <button
-                            className={`p-2 text-sm font-semibold ml-4 ${activeTab === "whitelist" ? "border-b-2 border-blue-500 text-blue-500" : "text-gray-500"
-                                }`}
-                            onClick={() => setActiveTab("whitelist")}
-                        >
-                            Whitelist IP
-                        </button>
-                    </div>
-
-                    {/* ✅ Tab Content */}
-                    {activeTab === "auth" ? (
-                        <div className="flex flex-col gap-6 mt-4">
-                            <div className="flex flex-col gap-4">
-                            
-                                <div className="flex flex-col sm:flex-row gap-4">
-                                    <div className="flex flex-col w-full">
-                                        <label className="text-gray-500 text-sm sm:text-xs">Username</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Enter username"
-                                            className="border p-2 rounded-lg text-sm sm:text-xs"
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col w-full">
-                                        <label className="text-gray-500 text-sm sm:text-xs">Password</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Enter password"
-                                            className="border p-2 rounded-lg text-sm sm:text-xs"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* ✅ Country-State-City Button */}
-                                <div className="flex justify-end">
-                                    <button className="py-2 px-4 bg-blue-500 text-white lg:px-27 rounded-lg shadow">Country-State-City</button>
-                                </div>
-                            </div>
-
-                            {/* ✅ Location Fields */}
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                <div className="flex flex-col w-full">
-                                    <label className="text-gray-500 text-sm sm:text-xs">Country</label>
-                                    <select
-                                        className="w-full border p-1 rounded-lg"
-                                        value={selectedCountry}
-                                        onChange={(e) => setSelectedCountry(e.target.value)}
-                                    >
-                                        <option value="">Select Country</option>
-                                        {countries.map((country) => (
-                                            <option key={country.country_code} value={country.country_code}>
-                                                {country.country_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col w-full">
-                                    <label className="text-gray-500 text-sm sm:text-xs">State</label>
-                                    <select
-                                        className="w-full border p-1 rounded-lg"
-                                        value={selectedState}
-                                        onChange={(e) => setSelectedState(e.target.value)}
-                                        disabled={!selectedCountry}
-                                    >
-                                        <option value="">Select State</option>
-                                        {states.map((state) => (
-                                            <option key={state.code} value={state.code}>
-                                                {state.code}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col w-full">
-                                    <label className="text-gray-500 text-sm sm:text-xs">City</label>
-                                    <select
-                                        className="w-full border p-1 rounded-lg"
-                                        disabled={!selectedState}
-                                    >
-                                        <option value="">Select City</option>
-                                        {cities.map((city) => (
-                                            <option key={city.code} value={city.code}>
-                                                {city.code}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* ✅ Action Buttons */}
-                            <div className="flex flex-col sm:flex-row justify-between gap-4 mt-4">
-                                <button className="py-2 px-4 bg-blue-500 text-white rounded-lg shadow flex justify-between items-center">
-                                    <p className="text-sm sm:text-xs">API Generator</p>
-                                    <ChevronRight />
-                                </button>
-                                <button className="py-2 px-4 bg-blue-500 text-white rounded-lg shadow flex justify-between items-center">
-                                    <p className="text-sm sm:text-xs">Update Settings</p>
-                                    <ChevronRight />
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="mt-4">
-                            <input type="text" placeholder="Enter IP Address" className="w-full border p-2 rounded-lg text-sm sm:text-xs" />
-                            <button className="py-2 px-4 bg-blue-500 text-white rounded-lg shadow mt-2 text-sm sm:text-xs">Add IP</button>
-                        </div>
-                    )}
-                </div>
-
-                {/* ✅ Proxy Settings Section */}
-                <div className="p-6 bg-white shadow rounded-lg w-full sm:w-1/2 flex flex-col gap-6">
-                    <div className="flex border-b">
-                        <button className="p-2 text-sm font-semibold text-gray-500">Proxy</button>
-                    </div>
-
-                    {/* ✅ Proxy Fields */}
-                    <div className="flex flex-col gap-6">
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="flex flex-col w-full">
-                                <label className="text-gray-500 text-sm sm:text-xs">Host</label>
-                                <input type="text" placeholder="resi-eu.lightningproxies.net" className="border p-2 rounded-lg text-sm sm:text-xs" />
-                            </div>
-                            <div className="flex flex-col w-full">
-                                <label className="text-gray-500 text-sm sm:text-xs">Port (HTTP & SOCKS)</label>
-                                <input type="text" placeholder="9999" className="border p-2 rounded-lg text-sm sm:text-xs" />
-                            </div>
-                        </div>
-
-                        {/* ✅ Rotating Proxy (ADDED) */}
-                        <div className="flex flex-col w-full">
-                            <label className="text-gray-500 text-sm sm:text-xs">Rotating Proxy</label>
-                            <input type="text" placeholder="resi-rotating.lightningproxies.net" className="border p-2 rounded-lg text-sm sm:text-xs" />
-                        </div>
-                    </div>
-
-                    {/* ✅ Sticky Sessions */}
-                    <div className="flex justify-between border-1 bg-gray-200 rounded-lg p-4 gap-4">
-                        <span className="w-2/3">
-                            <label className="text-gray-600 text-sm flex items-center">
-                                Sticky Sessions (Session time: {stickySession} min)
-                                <span className="ml-2 text-blue-500">ℹ</span>
-                            </label>
-                            <input type="range" min="1" max="60" value={stickySession} onChange={(e) => setStickySession(e.target.value)} className="w-full" />
-                        </span>
-
-                        <label className="ml-4 flex w-1/3 items-center">
-                            <span className="mr-1 text-sm">Activate Super Sticky</span>
-                            <input type="checkbox" checked={superSticky} onChange={() => setSuperSticky(!superSticky)} className="toggle-checkbox" />
-                        </label>
-                    </div>
-                    <div className="mt-4 flex justify-between items-center">
-                        <div className="flex items-center">
-                            <span className="text-gray-600 text-sm mr-2">Proxy Format Settings:</span>
-                            <span className="text-blue-500 cursor-pointer">🎵</span>
-                        </div>
-                        <div>
-                            <label className="text-gray-600 text-sm">Sticky count:</label>
-                            <input type="number" value="2000" className="border-1 p-1 rounded-lg w-20 ml-2" />
-                        </div>
-                    </div>
-
-                    {/* ✅ Proxy List */}
-                    <textarea className="w-full border p-2 rounded-lg h-32 overflow-x-auto overflow-y-auto text-sm sm:text-xs custom-scrollbar"
-                        style={{ textWrap: 'nowrap' }}>
-                        resi-ww.lightningproxies.net:9999:mvvxgqihzlgcklv120052-zone-resi-session-oX0Cz7gOTUd4
-                    </textarea>
-
-                    {/* ✅ Save & Copy Buttons */}
-                    <div className="mt-4 flex flex-col sm:flex-row justify-between gap-4">
-                        <button className="text-blue-500 text-sm sm:text-xs">⬇ Save as .txt</button>
-                        <button className="py-2 px-4 bg-blue-500 text-white rounded-lg shadow text-sm sm:text-xs">Copy Proxies</button>
-                    </div>
-                </div>
-            </div>
-
-        </main>
+    localStorage.setItem(
+      `proxyList-${plan.id}`,
+      JSON.stringify([...proxyList, proxyEntry])
     );
+    localStorage.setItem(`proxyString-${plan.id}`, rotatingProxy);
+  }, [
+    username,
+    password,
+    plan?.id,
+    selectedCountry,
+    selectedState,
+    selectedCity,
+    sessionTime,
+    sessionToken,
+  ]);
+
+  useEffect(() => {
+   
+    if (accountDetails) {
+      setAccountInfoState(accountDetails);
+      const fetchCountries = async () => {
+        try {
+          const response = await axios.post(
+            "https://lightning-backend.onrender.com/api/proxies/get-country-list"
+          );
+          if (response.data.success) {
+            setCountries(response.data.countries);
+          }
+        } catch (error) {
+          console.error("Error fetching countries:", error);
+        }
+      };
+      fetchCountries();
+    }
+  }, [accountDetails]);
+
+  useEffect(() => {
+    if (selectedCountry) {
+      const fetchStates = async () => {
+        try {
+          const response = await axios.post(
+            "https://lightning-backend.onrender.com/api/proxies/get-state-list",
+            {
+              country_code: selectedCountry,
+            }
+          );
+          if (response.data.success) {
+            setStates(response.data.states);
+            setCities([]);
+          }
+        } catch (error) {
+          console.error("Error fetching states:", error);
+        }
+      };
+      fetchStates();
+    }
+  }, [selectedCountry]);
+
+  useEffect(() => {
+    if (selectedCountry && selectedState) {
+      const fetchCities = async () => {
+        try {
+          const response = await axios.post(
+            "https://lightning-backend.onrender.com/api/proxies/get-city-list",
+            {
+              country_code: selectedCountry,
+              state: selectedState,
+            }
+          );
+          if (response.data.success) {
+            setCities(response.data.cities);
+          }
+        } catch (error) {
+          console.error("Error fetching cities:", error);
+        }
+      };
+      fetchCities();
+    }
+  }, [selectedState]);
+
+  const handleAddGigabytes = async () => {
+    if (!accountDetails?.id || gigabytesToAdd <= 0) {
+      alert("Invalid plan ID or gigabyte amount.");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        "https://lightning-backend.onrender.com/api/proxies/modify-gigabytes",
+        {
+          action: "add",
+          planId: accountDetails.id,
+          gigabytes: gigabytesToAdd,
+        }
+      );
+
+      if (response.data.success) {
+        alert("Gigabytes added successfully!");
+        console.log(response.data, "response for adding GB");
+        setGigabytesToAdd(0);
+
+        
+        const updatedBandwidthLeft = response.data.data.Remaining;
+
+        
+        const updatedAccountInfo = {
+          ...accountDetails,
+          bandwidth: accountDetails.bandwidth + gigabytesToAdd, // Add the requested GB
+          bandwidthLeft: updatedBandwidthLeft, // Update with API response value
+        };
+
+        
+        dispatch(setAccountInfo(updatedAccountInfo));
+
+        
+        localStorage.setItem("accountInfo", JSON.stringify(updatedAccountInfo));
+
+        
+        setAccountInfoState(updatedAccountInfo);
+      } else {
+        alert("Failed to add gigabytes.");
+      }
+    } catch (error) {
+      console.error("Error adding gigabytes:", error);
+      alert("Error adding gigabytes.");
+    }
+  };
+
+  useEffect(() => {
+    const storedProxies =
+      JSON.parse(localStorage.getItem(`proxyList-${plan.id}`)) || [];
+    const rotatingProxy = localStorage.getItem(`proxyString-${plan.id}`);
+    setProxyString(rotatingProxy);
+    setProxyList(storedProxies);
+  }, [plan?.id, accountDetails]);
+
+  
+
+  console.log(bandwidthData, "bandwidthdata");
+
+  useEffect(() => {
+    const fetchBandwidth = async () => {
+      try {
+        const response = await axios.get(
+          "https://lightning-backend.onrender.com/api/proxies/check-bandwidth"
+        );
+        console.log(response, "response");
+
+        if (response.data.success && response.data.latestCronData) {
+          
+          const filteredPlans = response.data.latestCronData.plans.filter(
+            (plan) => plan.user === username
+          );
+          console.log(filteredPlans, "filteredPlans");
+
+         
+          setBandwidthData({
+            ...response.data.latestCronData,
+            plans: filteredPlans,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching bandwidth data:", error);
+      }
+    };
+
+    fetchBandwidth(); 
+
+    
+    const interval = setInterval(fetchBandwidth, 6 * 1000);
+
+    return () => clearInterval(interval); 
+  }, [username]);
+
+  return (
+    <main className="px-0 xl:px-10 2xl:px-14">
+      
+      <div className="w-full mb-7 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-2xl font-semibold mb-0 text-[#292742]">
+            Generate Proxy
+          </h3>
+          <p className="text-[#292742] text-base m-0 mt-1">
+            Plan ID: {plan?.id}
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <p className="text-[#292742] text-base font-medium m-0">
+            Need Support ?
+          </p>
+          <button className="bg-[#1675ff] text-white text-base px-4 py-2.5 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-blue-700 transition font-semibold rounded-xl">
+            Contact Us{" "}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 320 512"
+              className="h-4 w-4"
+              fill="#fff"
+            >
+              <path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-6">
+        <div className="p-6 pb-5 bg-white border border-solid border-[#eaeaeb] rounded-xl">
+          <div className="flex justify-between gap-2.5  items-start ">
+            <div className="p-2 bg-blue-500 flex justify-center items-center shadow rounded-lg w-13 h-13">
+              <img
+                src="https://lightningproxies.net/assets/images/icons/qube.svg"
+                alt="calendar"
+              />
+            </div>
+            <button className="bg-[#e5f3ff] w-max border border-solid border-[#1675ff] text-[#1675ff] text-sm px-2 py-0.5 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-[#e5f3ff] transition font-semibold rounded-lg">
+              Plan Settings
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 320 512"
+                className="h-3 w-3"
+                fill="#1675ff"
+              >
+                <path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="pt-4">
+            <h3 className="text-[#292742] text-base leading-[20px] font-normal m-0">
+              Current Plan
+            </h3>
+            <p className="text-[#292742] text-xl font-semibold m-0">
+              Residential {plan?.bandwidth} GB
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6 pb-5 bg-white border border-solid border-[#eaeaeb] rounded-xl">
+          <div className="flex justify-between gap-2.5  items-start ">
+            <div className="p-2 bg-blue-500 flex justify-center items-center shadow rounded-lg w-13 h-13">
+              <img
+                src="https://lightningproxies.net/assets/images/icons/date-w.svg"
+                alt="calendar"
+              />
+            </div>
+            <button className="bg-[#e5f3ff] w-max border border-solid border-[#1675ff] text-[#1675ff] text-sm px-2 py-0.5 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-[#e5f3ff] transition font-semibold rounded-lg">
+              Auto Renew
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 320 512"
+                className="h-3 w-3"
+                fill="#1675ff"
+              >
+                <path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="pt-4">
+            <h3 className="text-[#292742] text-base leading-[20px] font-normal m-0">
+              Plan Expiry
+            </h3>
+            <p className="text-[#292742] text-xl font-semibold m-0">
+              {accountInfo ? formatDate(accountInfo?.expiresAt) : null}
+            </p>
+          </div>
+        </div>
+
+        <div className="col-span-1 md:col-span-2 p-6 pb-5 bg-white border border-solid border-[#eaeaeb] rounded-xl grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="w-full  border-b md:border-b-0 md:border-r border-[#c5e3ff] pb-4 md:pb-0 md:pr-4 flex flex-col sm:items-start">
+            
+            
+            <div className="p-2 bg-blue-500 flex justify-center items-center shadow rounded-lg w-13 h-13">
+            <img
+            src="https://lightningproxies.net/assets/images/icons/quee.svg"
+            alt="calendar"
+          />
+            </div>
+
+          <div className="pt-4">
+            <h3 className="text-[#292742] text-base leading-[20px] font-normal m-0">
+            Total Bandwidth
+            </h3>
+            <p className="text-[#292742] text-xl font-semibold m-0">
+            {Math.round(plan?.bandwidth)} GB
+            </p>
+          </div>
+          </div>
+          <div class="col-span-1 md:col-span-2 flex items-center gap-3 flex-wrap md:flex-nowrap ">
+              <DataLeftCircle
+                usedData={Math.round(plan?.bandwidthLeft)}
+                totalData={Math.round(plan?.bandwidth)}
+              />
+
+            <div className="w-full">
+              <div className="flex flex-col justify-between gap-2 w-full">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center flex-wrap">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-3 h-3 bg-[#8bbaff] rounded-full"></span>
+                      <p className="text-[#888] text-sm font-normal block">
+                        Used Bandwidth:
+                      </p>
+                    </div>
+                    <p className="text-[#292742] text-sm font-bold block mt-1">
+                      {(
+                        bandwidthData?.plans[0].bandwidth -
+                        bandwidthData?.plans[0].bandwidthLeft
+                      )?.toFixed(2)}{" "}
+                      GB
+                    </p>
+                  </div>
+
+                  <div className="flex justify-between items-center flex-wrap">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-3 h-3 bg-[#1675ff] rounded-full"></span>
+                      <p className="text-[#888] text-sm font-normal block">
+                        Remaining Bandwidth:
+                      </p>
+                    </div>
+                    <p className="text-[#292742] text-sm font-bold block">
+                      {bandwidthData?.plans[0]?.bandwidthLeft?.toFixed(2)} GB
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-1 lg:ml-5">
+                  <div className="flex flex-col w-full">
+                    <label className="text-[#292742] text-sm font-medium block mb-1">
+                      Add Bandwidth
+                    </label>
+                    <div className="flex justify-between items-center gap-2 sm:gap-4">
+                    <div className="relative max-w-[180px] w-full">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        min={1}
+                        value={gigabytesToAdd === 0 ? "" : gigabytesToAdd} // ✅ Prevents 0 from sticking
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setGigabytesToAdd(
+                            val === "" ? "" : Math.max(1, parseInt(val))
+                          ); 
+                        }}
+                        className="w-full px-2.5 h-[32px] text-[#292742] font-medium text-sm py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-md"
+                      />
+                      <span className="absolute right-2 top-[5px] text-[#1675ff] text-sm font-medium">GB</span>
+                      </div>
+                      <button
+                        onClick={handleAddGigabytes}
+                         className="bg-[#1675ff] text-white text-sm px-3 py-1 h-[32px] cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-blue-700 transition font-semibold rounded-md"
+                      >
+                          Add
+                          <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 320 512"
+                className="h-3 w-3"
+                fill="#fff"
+              >
+                <path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z" />
+              </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="mt-6">
+        <div className="w-full mb-7">
+          <h3 className="text-2xl font-semibold mb-0 text-[#292742]">
+            Configure Proxy
+          </h3>
+          <p className="text-[#292742] text-base m-0 mt-1">
+            Configure your proxy type, and whitelist IP
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6  items-start">
+          <div className="p-0 bg-white border border-solid border-[#eaeaeb] rounded-xl">
+            <div className="flex flex-col-reverse sm:flex-row justify-between items-start gap-3 pt-3 border-b border-b-solid border-b-[#eaeaeb]">
+            
+
+            
+            <div className="flex">
+              <button
+                className={`p-2 px-4 text-[15px] cursor-pointer font-medium border-b-2  ${
+                  activeTab === "auth"
+                    ? " border-[#1675ff] text-[#292742]"
+                    : "text-[#888] border-transparent"
+                }`}
+                onClick={() => setActiveTab("auth")}
+              >
+                User Auth & Pass
+              </button>
+              <button
+                className={`p-2 px-4 text-[15px] cursor-pointer font-medium border-b-2 ${
+                  activeTab === "whitelist"
+                    ? " border-[#1675ff]  text-[#292742]"
+                    : "text-[#888] border-transparent"
+                }`}
+                onClick={() => setActiveTab("whitelist")}
+              >
+                Whitelist IP
+              </button>
+            </div>
+            <div className="flex justify-end gap-4 px-5 sm:pl-0 sm:pr-3">
+              <span className="text-sm flex items-center">
+              <input type="radio" checked className="mr-1.5" name="Proxy" id="Stander" /><label for="Stander">Stander</label></span>
+              <span className="text-sm flex items-center">
+              <input type="radio" className="mr-1.5" name="Proxy" id="Regions" /><label for="Regions">Regions</label></span>
+            </div>
+            </div>
+<div className="p-6 py-4 pb-14">
+           
+            {activeTab === "auth" ? (
+              <div className="flex flex-col gap-5">
+                  <div className="grid gap-5 grid-cols-1 sm:grid-cols-2">
+                    <div className="flex flex-col w-full">
+                      <label className="text-[#888] text-sm font-medium block mb-1">
+                        Username
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter username"
+                        className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col w-full">
+                      <label className="text-[#888] text-sm font-medium block mb-1">
+                        Password
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter password"
+                        className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </div>
+                    <div className="hidden sm:block"></div>
+                    <button className="bg-[#1675ff] text-white text-[15px] px-4 py-2 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-blue-700 transition font-semibold rounded-lg">
+                      Country-State-City
+                    </button>
+                  </div>
+
+             
+
+                
+                <div className="grid gap-5 grid-cols-1 sm:grid-cols-3">
+                  <div className="flex flex-col w-full">
+                    <label className="text-[#888] text-sm font-medium block mb-1">
+                      Country
+                    </label>
+                    <select
+                      className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                      value={selectedCountry}
+                      onChange={(e) => setSelectedCountry(e.target.value)}
+                    >
+                      <option value="">Select Country</option>
+                      {countries.map((country) => (
+                        <option
+                          key={country.country_code}
+                          value={country.country_code}
+                        >
+                          {country.country_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col w-full">
+                    <label className="text-[#888] text-sm font-medium block mb-1">
+                      State
+                    </label>
+                    <select
+                      className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                      value={selectedState}
+                      onChange={(e) => setSelectedState(e.target.value)}
+                      disabled={!selectedCountry}
+                    >
+                      <option value="">Select State</option>
+                      {states.map((state) => (
+                        <option key={state.code} value={state.code}>
+                          {state.code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col w-full">
+                    <label className="text-[#888] text-sm font-medium block mb-1">
+                      City
+                    </label>
+                    <select
+                      className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                      disabled={!selectedState}
+                      value={selectedCity}
+                      onChange={(e) => setSelectedCity(e.target.value)}
+                    >
+                      <option value="">Select City</option>
+                      {cities.map((city) => (
+                        <option key={city.code} value={city.code}>
+                          {city.code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                  <button className="bg-[#1675ff] text-white text-[15px] px-4 py-2 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-blue-700 transition font-semibold rounded-lg">
+                    API Generator
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" class="h-4 w-4" fill="#fff"><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"></path></svg>
+                  </button>
+                  <button
+                    onClick={generateProxy}
+                    className="bg-[#1675ff] text-white text-[15px] px-4 py-2 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-blue-700 transition font-semibold rounded-lg"
+                  >
+                    Update Settings
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" class="h-4 w-4" fill="#fff"><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"></path></svg>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="">
+                <input
+                  type="text"
+                  placeholder="Enter IP Address"
+                  className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                />
+                <button className="mt-3 bg-[#1675ff] text-white text-[15px] px-4 py-2 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-blue-700 transition font-semibold rounded-lg">
+                  Add IP
+                </button>
+              </div>
+            )}
+            </div>
+          </div>
+
+          <div className="p-0 bg-white border border-solid border-[#eaeaeb] rounded-xl">
+            <h6 className="text-[#292742] text-base font-medium block m-0 p-6 py-4 border-b border-b-solid border-b-[#eaeaeb]">
+                Proxy
+            </h6>
+<div className=" p-6 py-4">
+            
+            <div className="grid gap-5 grid-cols-1 sm:grid-cols-2">
+                <div className="flex flex-col w-full">
+                  <label className="text-[#888] text-sm font-medium block mb-1">
+                    Host
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="resi-eu.lightningproxies.net"
+                    className="w-full px-2.5 text-[#292742] font-medium text-sm py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                  />
+                </div>
+                <div className="flex flex-col w-full">
+                  <label className="text-[#888] text-sm font-medium block mb-1">
+                    Port (HTTP & SOCKS)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="9999"
+                    className="w-full px-2.5 text-[#292742] font-medium text-sm py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                  />
+                </div>
+
+              
+              <div className="flex flex-col w-full col-span-1 sm:col-span-2">
+                <label className="text-[#888] text-sm font-medium block mb-1">
+                  Rotating Proxy
+                </label>
+                <input
+                  type="text"
+                  placeholder={
+                    proxyString || "resi-rotating.lightningproxies.net"
+                  }
+                  className="w-full px-2.5 text-[#292742] font-medium text-sm py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+                />
+              </div>
+              
+            <div className="border-1 border-solid border-[#eaeaeb] bg-[#fafafa] rounded-lg p-4 pt-5 col-span-1 sm:col-span-2">
+            <span className="w-2/3">
+              <label className="text-[#292742] text-[15px] font-medium block mb-2.5">
+                Sticky Sessions (Session time: {formatTime(sessionTime)} min)
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="60"
+                value={stickySession}
+                onChange={(e) => setStickySession(e.target.value)}
+                className="w-full"
+              />
+            </span>
+          </div>
+            <div className="col-span-1 sm:col-span-2 flex gap-2 items-center">
+              <label className="text-[#292742] text-[15px] font-medium block">Sticky count:</label>
+              <input
+                type="number"
+                value="2000"
+                className="px-4 max-w-24 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
+              />
+            </div>
+
+          
+          <textarea
+            className="w-full col-span-1 sm:col-span-2 px-4 text-[#292742] font-medium text-sm py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg custom-scrollbar"
+            style={{ whiteSpace: "pre-wrap" }} 
+            readOnly
+            value={
+              proxyList.length > 0
+                ? proxyList.join("\n")
+                : "No proxies stored."
+            }
+          />
+            </div>
+
+            
+
+           
+            <div className="mt-4 flex flex-col sm:flex-row justify-between gap-4">
+              <button className="bg-transparent text-[#1675ff] text-base p-2 cursor-pointer flex justify-center text-center items-center gap-1 transition font-semibold rounded-xl">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="#1675ff" className="h-4 w-4"><path d="M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.8 224 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 306.7L54.6 265.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z"/></svg> Save as .txt
+              </button>
+              <button className="bg-[#1675ff] text-white text-base px-4 py-2 cursor-pointer flex justify-center text-center items-center gap-0.5 hover:bg-blue-700 transition font-semibold rounded-xl">
+                Copy Proxies
+              </button>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
 };
 
 export default ProxyComponent;
