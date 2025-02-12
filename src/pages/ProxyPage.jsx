@@ -35,6 +35,7 @@ const ProxyComponent = () => {
   const [bandwidthData, setBandwidthData] = useState(null);
 
   const dispatch = useDispatch();
+  
 
   useEffect(() => {
     if (!accountDetails) {
@@ -43,12 +44,11 @@ const ProxyComponent = () => {
         const parsedAccountInfo = JSON.parse(storedAccountInfo);
         setAccountInfoState(parsedAccountInfo); // ✅ Updates local state
         dispatch(setAccountInfo(parsedAccountInfo)); // ✅ Updates Redux
-        console.log("Loaded account details from localStorage into Redux");
       }
     }
   }, [dispatch, accountDetails]);
 
-  console.log(bandwidthData, "bandwidthData");
+ 
 
   const generateProxy = useCallback(() => {
     if (!username || !password || !plan?.id) return; // Ensure required fields exist
@@ -67,14 +67,22 @@ const ProxyComponent = () => {
     ]
       .filter(Boolean)
       .join("-");
-
-    const rotatingProxy = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}-${formattedSessionTime}:${password}`;
+    let rotatingProxy = `${host}:${port}:${username}-${zone}-${password}`
+    if (selectedCountry) {
+      rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}`
+      if(selectedState) {
+        rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}`
+        if(selectedCity){
+          rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}-city-${selectedCity}`
+        }
+      }
+    }
+    // const rotatingProxy = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}-${formattedSessionTime}:${password}`;
 
     const proxyEntry = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}:${password}`;
 
     setProxyString(rotatingProxy);
     setProxyList((prev) => [...prev, proxyEntry]); // ✅ Use function form to avoid unnecessary dependencies
-
     localStorage.setItem(
       `proxyList-${plan.id}`,
       JSON.stringify([...proxyList, proxyEntry])
@@ -173,7 +181,7 @@ const ProxyComponent = () => {
 
       if (response.data.success) {
         alert("Gigabytes added successfully!");
-        console.log(response.data, "response for adding GB");
+        
         setGigabytesToAdd(0);
 
 
@@ -213,7 +221,8 @@ const ProxyComponent = () => {
 
 
 
-  console.log(bandwidthData, "bandwidthdata");
+  
+  
 
   useEffect(() => {
     const fetchBandwidth = async () => {
@@ -221,14 +230,14 @@ const ProxyComponent = () => {
         const response = await axios.get(
           "https://lightning-backend.onrender.com/api/proxies/check-bandwidth"
         );
-        console.log(response, "response");
+        
 
         if (response.data.success && response.data.latestCronData) {
 
           const filteredPlans = response.data.latestCronData.plans.filter(
             (plan) => plan.user === username
           );
-          console.log(filteredPlans, "filteredPlans");
+          
 
 
           setBandwidthData({
@@ -395,7 +404,7 @@ const ProxyComponent = () => {
                       </p>
                     </div>
                     <p className="text-[#292742] text-sm font-bold block">
-                      {bandwidthData?.plans[0]?.bandwidthLeft?.toFixed(2)|| accountInfo?.bandwidthLeft} GB
+                      {bandwidthData?.plans[0]?.bandwidthLeft?.toFixed(2) || accountInfo?.bandwidthLeft} GB
                     </p>
                   </div>
                 </div>
@@ -463,8 +472,8 @@ const ProxyComponent = () => {
               <div className="flex">
                 <button
                   className={`p-2 px-4 text-[15px] cursor-pointer font-medium border-b-2  ${activeTab === "auth"
-                      ? " border-[#1675ff] text-[#292742]"
-                      : "text-[#888] border-transparent"
+                    ? " border-[#1675ff] text-[#292742]"
+                    : "text-[#888] border-transparent"
                     }`}
                   onClick={() => setActiveTab("auth")}
                 >
@@ -472,8 +481,8 @@ const ProxyComponent = () => {
                 </button>
                 <button
                   className={`p-2 px-4 text-[15px] cursor-pointer font-medium border-b-2 ${activeTab === "whitelist"
-                      ? " border-[#1675ff]  text-[#292742]"
-                      : "text-[#888] border-transparent"
+                    ? " border-[#1675ff]  text-[#292742]"
+                    : "text-[#888] border-transparent"
                     }`}
                   onClick={() => setActiveTab("whitelist")}
                 >
@@ -533,7 +542,8 @@ const ProxyComponent = () => {
                       <select
                         className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
                         value={selectedCountry}
-                        onChange={(e) => setSelectedCountry(e.target.value)}
+                        onChange={(e) => { setSelectedCountry(e.target.value)
+                        }}
                       >
                         <option value="">Select Country</option>
                         {countries.map((country) => (
@@ -650,7 +660,7 @@ const ProxyComponent = () => {
                   <input
                     type="text"
                     placeholder={
-                      proxyString || "resi-rotating.lightningproxies.net"
+                      proxyString || ""
                     }
                     className="w-full px-2.5 text-[#292742] font-medium text-sm py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
                   />
