@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 import { useSelector, useDispatch } from "react-redux";
 import { setAccountInfo } from "../redux/accountSlice";
-import { formatDate, formatTime } from "../assets/usables";
+import { formatDate, formatTime, formatCustomDate } from "../assets/usables";
 import DataLeftCircle from "../components/DataLeftCircles";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
@@ -35,10 +35,27 @@ const ProxyComponent = () => {
   const [selectedState, setSelectedState] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [bandwidthData, setBandwidthData] = useState(null);
+  const [planDetails, setPlanDetails] = useState(null);
+  const [expiryDate, setExpiryDate] = useState(null);
 
   const dispatch = useDispatch();
-  
 
+  useEffect(() => {
+    const fetchPlanDetails = async () => {
+        try {
+            const response = await axios.get(`http://localhost:5000/api/proxies/get-plan-details/${plan.id}`);
+            if (response.data.success) {
+                setPlanDetails(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching plan details:', error);
+        }
+    };
+
+    if (plan?.id) {
+        fetchPlanDetails();
+    }
+}, [plan?.id]);
   useEffect(() => {
     const enterTime = Date.now(); // Timestamp when the page is opened
 
@@ -55,6 +72,7 @@ const ProxyComponent = () => {
   }, []);
   useEffect(() => {
     if (!accountDetails) {
+      setExpiryDate(accountDetails.expiresAt);
       const storedAccountInfo = localStorage.getItem("accountInfo");
       if (storedAccountInfo) {
         const parsedAccountInfo = JSON.parse(storedAccountInfo);
@@ -64,7 +82,7 @@ const ProxyComponent = () => {
     }
   }, [dispatch, accountDetails]);
 
- 
+
 
   const generateProxy = useCallback(() => {
     if (!username || !password || !plan?.id) return; // Ensure required fields exist
@@ -73,25 +91,19 @@ const ProxyComponent = () => {
     const port = "9999"; // Static Port
     const zone = "zone-resi"; // Static Zone
     const sessionId = Math.random().toString(36).substring(2, 10); // Random session ID
-    
-    let sessionTimeInMinutes = sessionTime/60;
 
-    const locationString = [
-      selectedCountry ? `country-${selectedCountry}` : null,
-      selectedState ? `state-${selectedState}` : null,
-      selectedCity ? `city-${selectedCity}` : null,
-    ]
-      .filter(Boolean)
-      .join("-");
+    let sessionTimeInMinutes = sessionTime / 60;
+
+    
     let rotatingProxy = `${host}:${port}:${username}-${zone}-${password}`
     let proxyEntry = `${host}:${port}:${username}-${zone}-session-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
     if (selectedCountry) {
       rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}`
       proxyEntry = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
-      if(selectedState) {
+      if (selectedState) {
         rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}`
         proxyEntry = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
-        if(selectedCity){
+        if (selectedCity) {
           rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}-city-${selectedCity}`
           proxyEntry = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}-city-${selectedCity}-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
 
@@ -100,7 +112,7 @@ const ProxyComponent = () => {
     }
     // const rotatingProxy = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}-${formattedSessionTime}:${password}`;
 
-    
+
 
     // const proxyEntry = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}:${password}`;
 
@@ -204,7 +216,7 @@ const ProxyComponent = () => {
 
       if (response.data.success) {
         alert("Gigabytes added successfully!");
-        
+
         setGigabytesToAdd(0);
 
 
@@ -244,29 +256,29 @@ const ProxyComponent = () => {
 
 
 
-  
-  
+
+
 
   useEffect(() => {
     const socket = io("https://lightning-backend.onrender.com/"); // Connect to WebSocket
-  
+
     // Listen for real-time updates
     socket.on("data-update", (data) => {
       console.log("📡 Received real-time bandwidth update:", data);
-  
+
       if (data && data.plans) {
         const filteredPlans = data.plans.filter((plan) => plan.user === username);
         console.log("got data")
         setBandwidthData({ ...data, plans: filteredPlans });
       }
     });
-  
+
     // Cleanup WebSocket connection on unmount
     return () => {
       socket.disconnect();
     };
   }, [username]);
-  
+
 
   return (
     <main className="px-0 xl:px-10 2xl:px-14">
@@ -356,7 +368,7 @@ const ProxyComponent = () => {
               Plan Expiry
             </h3>
             <p className="text-[#292742] text-xl font-semibold m-0">
-              {accountInfo ? formatDate(accountInfo?.expiresAt) : null}
+              {planDetails ? formatCustomDate(planDetails?.expiration_date): expiryDate}
             </p>
           </div>
         </div>
@@ -552,7 +564,8 @@ const ProxyComponent = () => {
                       <select
                         className="w-full px-4 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
                         value={selectedCountry}
-                        onChange={(e) => { setSelectedCountry(e.target.value)
+                        onChange={(e) => {
+                          setSelectedCountry(e.target.value)
                         }}
                       >
                         <option value="">Select Country</option>
@@ -695,7 +708,7 @@ const ProxyComponent = () => {
                   <label className="text-[#292742] text-[15px] font-medium block">Sticky count:</label>
                   <input
                     type="number"
-                    value="2000"
+                    value={proxyList.length > 0 ? proxyList.length : "2000" || "2000"}
                     className="px-4 max-w-24 text-[#292742] font-medium text-[15px] py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-solid border-[#eaeaeb] rounded-lg"
                   />
                 </div>

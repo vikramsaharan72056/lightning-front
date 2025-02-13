@@ -18,8 +18,19 @@ const formatDate = (isoDate) => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+const formatCustomDate = (isoString) => {
+  const date = new Date(isoString);
+  const day = date.getDate();
+  const month = date.toLocaleString('en-GB', { month: 'short' }).toUpperCase(); // MAY
+  const year = date.getFullYear();
+  const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  return `${day} ${month} ${year} ${time}`;
+};
 
 
 
 
-  export {formatDate,formatTime};
+
+
+  export {formatDate,formatTime,formatCustomDate};

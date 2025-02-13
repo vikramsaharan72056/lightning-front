@@ -39,7 +39,6 @@ const Dashboard = () => {
         const response = await axios.get(
           "https://lightning-backend.onrender.com/api/proxies/get-plan-list"
         );
-        console.log(response, "response for plan count");
         if (response.data.success) {
           // Filter plans by user
           const userPlans = response.data.plans;
@@ -56,8 +55,7 @@ const Dashboard = () => {
 
   
 
-  const totalData = accountDetails?.bandwidth || 1; 
-  const dataLeft = accountDetails?.bandwidthLeft || 0;
+  
   
   
 
