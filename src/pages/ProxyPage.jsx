@@ -227,7 +227,7 @@ const ProxyComponent = () => {
   
 
   useEffect(() => {
-    const socket = io("http://localhost:5000/"); // Connect to WebSocket
+    const socket = io("https://lightning-backend.onrender.com/"); // Connect to WebSocket
   
     // Listen for real-time updates
     socket.on("data-update", (data) => {
