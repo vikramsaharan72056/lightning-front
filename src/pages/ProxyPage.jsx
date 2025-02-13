@@ -40,6 +40,20 @@ const ProxyComponent = () => {
   
 
   useEffect(() => {
+    const enterTime = Date.now(); // Timestamp when the page is opened
+
+    const interval = setInterval(() => {
+      const currentTime = Date.now();
+      const timeSpentInSeconds = Math.floor((currentTime - enterTime) / 1000); // Time in seconds
+      setSessionTime(timeSpentInSeconds); // Update state every second
+    }, 1000);
+
+    // Clean up on unmount
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+  useEffect(() => {
     if (!accountDetails) {
       const storedAccountInfo = localStorage.getItem("accountInfo");
       if (storedAccountInfo) {
@@ -59,8 +73,8 @@ const ProxyComponent = () => {
     const port = "9999"; // Static Port
     const zone = "zone-resi"; // Static Zone
     const sessionId = Math.random().toString(36).substring(2, 10); // Random session ID
-    const formattedSessionTime = `sessTime-${sessionTime}`;
-
+    
+    let sessionTimeInMinutes = sessionTime/60;
 
     const locationString = [
       selectedCountry ? `country-${selectedCountry}` : null,
@@ -70,18 +84,25 @@ const ProxyComponent = () => {
       .filter(Boolean)
       .join("-");
     let rotatingProxy = `${host}:${port}:${username}-${zone}-${password}`
+    let proxyEntry = `${host}:${port}:${username}-${zone}-session-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
     if (selectedCountry) {
       rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}`
+      proxyEntry = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
       if(selectedState) {
         rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}`
+        proxyEntry = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
         if(selectedCity){
           rotatingProxy = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}-city-${selectedCity}`
+          proxyEntry = `${host}:${port}:${username}-${zone}-region-${selectedCountry}-st-${selectedState}-city-${selectedCity}-${sessionId}-sessTime-${sessionTimeInMinutes}:${password}`
+
         }
       }
     }
     // const rotatingProxy = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}-${formattedSessionTime}:${password}`;
 
-    const proxyEntry = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}:${password}`;
+    
+
+    // const proxyEntry = `${host}:${port}:${username}-${zone}-${locationString}-session-${sessionId}:${password}`;
 
     setProxyString(rotatingProxy);
     setProxyList((prev) => [...prev, proxyEntry]); // ✅ Use function form to avoid unnecessary dependencies
